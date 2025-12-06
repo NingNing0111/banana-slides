@@ -3,10 +3,14 @@ Reference File Controller - handles file upload and parsing
 """
 import os
 import logging
+import re
+import uuid
 from flask import Blueprint, request, current_app
 from werkzeug.utils import secure_filename
 from pathlib import Path
+from config import Config
 from datetime import datetime
+from urllib.parse import unquote
 import threading
 
 from models import db, ReferenceFile, Project
@@ -120,13 +124,11 @@ def upload_reference_file():
             # Try to get filename from Content-Disposition header
             content_disposition = request.headers.get('Content-Disposition', '')
             if content_disposition:
-                import re
                 filename_match = re.search(r'filename[^;=\n]*=(([\'"]).*?\2|[^;\n]*)', content_disposition)
                 if filename_match:
                     original_filename = filename_match.group(1).strip('"\'')
                     # Decode if URL encoded
                     try:
-                        from urllib.parse import unquote
                         original_filename = unquote(original_filename)
                     except:
                         pass
@@ -137,7 +139,8 @@ def upload_reference_file():
         logger.info(f"Received file upload: {original_filename}")
         
         # Check file extension
-        allowed_extensions = current_app.config.get('ALLOWED_REFERENCE_FILE_EXTENSIONS', {'pdf', 'docx', 'pptx'})
+        
+        allowed_extensions = current_app.config.get('ALLOWED_REFERENCE_FILE_EXTENSIONS', Config.ALLOWED_REFERENCE_FILE_EXTENSIONS)
         if not _allowed_file(original_filename, allowed_extensions):
             return bad_request(f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}")
         
@@ -161,7 +164,6 @@ def upload_reference_file():
             ext = _get_file_type(original_filename)
             if ext == 'unknown':
                 ext = 'file'
-            import uuid
             filename = f"file_{uuid.uuid4().hex[:8]}.{ext}"
             logger.warning(f"Original filename '{original_filename}' was sanitized to '{filename}'")
         
@@ -171,7 +173,6 @@ def upload_reference_file():
         reference_files_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate unique filename to avoid conflicts
-        import uuid
         unique_id = str(uuid.uuid4())[:8]
         file_type = _get_file_type(original_filename)  # Use original filename for type detection
         unique_filename = f"{unique_id}_{filename}"

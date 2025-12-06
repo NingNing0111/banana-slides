@@ -126,14 +126,33 @@ def serve_mineru_file(extract_id, filepath):
         root_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'mineru_files', extract_id)
         full_path = Path(root_dir) / filepath
 
-        # Basic path traversal protection
-        if not os.path.abspath(str(full_path)).startswith(os.path.abspath(root_dir)):
-            return error_response('INVALID_PATH', 'Invalid file path', 403)
+        # Enhanced path traversal protection with symlink resolution
+        # Resolve real paths (including symlinks) and check if the resolved path
+        # is a child of the resolved root directory
+        try:
+            resolved_full_path = full_path.resolve(strict=True)
+            resolved_root_dir = Path(root_dir).resolve(strict=True)
+            
+            # Check if resolved path is relative to resolved root directory
+            if not resolved_full_path.is_relative_to(resolved_root_dir):
+                return error_response('INVALID_PATH', 'Invalid file path', 403)
+        except FileNotFoundError:
+            return not_found('File')
 
         # Try to find file with prefix matching
         matched_path = find_file_with_prefix(full_path)
         
         if matched_path is not None:
+            # Additional security check for matched path
+            try:
+                resolved_matched_path = matched_path.resolve(strict=True)
+                resolved_root_dir = Path(root_dir).resolve(strict=True)
+                
+                if not resolved_matched_path.is_relative_to(resolved_root_dir):
+                    return error_response('INVALID_PATH', 'Invalid file path', 403)
+            except FileNotFoundError:
+                return not_found('File')
+            
             return send_from_directory(str(matched_path.parent), matched_path.name)
 
         return not_found('File')
