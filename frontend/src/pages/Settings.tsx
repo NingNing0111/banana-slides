@@ -259,6 +259,7 @@ export const Settings: React.FC = () => {
       if (response.data) {
         setSettings(response.data);
         show({ message: '设置保存成功', type: 'success' });
+        show({ message: '建议在本页底部进行服务测试，验证关键配置', type: 'info' });
         setFormData(prev => ({ ...prev, api_key: '', mineru_token: '' }));
       }
     } catch (error: any) {
